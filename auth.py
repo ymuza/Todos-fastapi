@@ -1,20 +1,26 @@
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI, Depends
-import models
+
+from fastapi import Depends, FastAPI
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from pydantic import BaseModel
-from password_management import get_password_hash, verify_password
 from sqlalchemy.orm import Session
+
+import models
 from database import SessionLocal, engine
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from exceptions import user_validation_exception
-from datetime import timedelta, datetime
-from jose import jwt
+from exceptions import get_user_exception, token_exception
+from password_management import get_password_hash, verify_password
 
 SECRET_KEY = ""
 ALGORITHM = "HS256"
 
 
+@dataclass
 class CreateUser(BaseModel):
+    """User table data"""
+
     username: str
     email: Optional[str]
     first_name: str
@@ -22,13 +28,17 @@ class CreateUser(BaseModel):
     password: str
 
 
-models.Base.metadata.create_all(bind=engine)  # creates the db and does all the importan stuff for the table
+# creates the db and does all the importan stuff for the table
+models.Base.metadata.create_all(bind=engine)
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="token")
 
 
-def authenticate_user(username: str, password: str, db):
-    user = db.query(models.Users).filter(models.Users.username == username).first()
+def authenticate_user(username: str, password: str, data_base):
+    """authenticates user"""
+    user = (
+        data_base.query(models.Users).filter(models.Users.username == username).first()
+    )
 
     if not user:
         return False
@@ -41,15 +51,18 @@ app = FastAPI()
 
 
 def get_db():
+    """retrieves the conection to the db"""
     try:
-        db = SessionLocal()
-        yield db
+        data_base = SessionLocal()
+        yield data_base
     finally:
-        db.close()
+        data_base.close()
 
 
-def create_access_token(username: str, user_id: int,
-                        expires_delta: Optional[timedelta] = None):
+def create_access_token(
+    username: str, user_id: int, expires_delta: Optional[timedelta] = None
+):
+    """creates the access token for the user"""
     encode = {"sub": username, "id": user_id}
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -60,8 +73,24 @@ def create_access_token(username: str, user_id: int,
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+async def get_current_user(token: str = Depends(oauth2_bearer)):
+    """gets current user"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        user_id: int = payload.get("id")
+        if username is None or user_id is None:
+            raise get_user_exception()
+        return {"username": username, "id": user_id}
+    except JWTError as exc:
+        raise get_user_exception() from exc
+
+
 @app.post("/create/user")
-async def create_new_user(create_user: CreateUser, db: Session = Depends(get_db)):
+async def create_new_user(
+    create_user: CreateUser, data_base: Session = Depends(get_db)
+):
+    """creates a new user in the db"""
     create_user_model = models.Users()
     create_user_model.email = create_user.email
     create_user_model.username = create_user.username
@@ -75,18 +104,21 @@ async def create_new_user(create_user: CreateUser, db: Session = Depends(get_db)
     create_user_model.hashed_password = hash_password
     create_user_model.is_active = True
 
-    db.add(create_user_model)
-    db.commit()
+    data_base.add(create_user_model)
+    data_base.commit()
 
     return {"user has been added."}
 
 
 @app.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(),
-                                 db: Session = Depends(get_db)):
-    user = authenticate_user(form_data.username, form_data.password, db)
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    data_base: Session = Depends(get_db),
+):
+    """returns the access token for the user"""
+    user = authenticate_user(form_data.username, form_data.password, data_base)
     if not user:
-        raise user_validation_exception()
+        raise token_exception()
     token_expires = timedelta(minutes=20)
     token = create_access_token(user.username, user.id, expires_delta=token_expires)
 
