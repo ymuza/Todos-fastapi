@@ -1,12 +1,10 @@
-from dataclasses import dataclass
-
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from database import Base
 
-@dataclass
 class Users(Base):
     """Users table"""
+
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
@@ -22,6 +20,7 @@ class Users(Base):
 
 class Todos(Base):
     """todos table"""
+
     __tablename__ = "todos"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String)

@@ -1,9 +1,11 @@
-from dataclasses import dataclass
 from typing import Optional
+
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+
 import models
+from auth import get_current_user, get_user_exception
 from database import SessionLocal, engine
 from exceptions import http_exception
 from responses import successful_response
@@ -23,7 +25,6 @@ def get_db():
         data_base.close()  # close the data_base session regardless of the use
 
 
-@dataclass
 class Todo(BaseModel):
     """todos table data"""
 
@@ -43,26 +44,53 @@ async def read_all(
     return data_base.query(models.Todos).all()  # returns all the records from the Todos
 
 
+@app.get("/todos/user")
+async def read_all_by_user(
+    user: dict = Depends(get_current_user), data_base: Session = Depends(get_db)
+):
+    """gets every Todos of a particular user"""
+    if user is None:
+        raise get_user_exception()
+    return (
+        data_base.query(models.Todos)
+        .filter(models.Todos.owner_id == user.get("id"))
+        .all()
+    )
+
+
 @app.get("/todo/{todo_id}")
-async def read_todo(todo_id: int, data_base: Session = Depends(get_db)):
+async def read_todo(
+    todo_id: int,
+    user: dict = Depends(get_current_user),
+    data_base: Session = Depends(get_db),
+):
     """gets a "to do" activity by passing a todo_id"""
+    if user is not None:
+        raise get_user_exception()
     todo_model = (
-        data_base.query(models.Todos).filter(models.Todos.id == todo_id).first()
+        data_base.query(models.Todos)
+        .filter(models.Todos.id == todo_id)
+        .filter(models.Todos.owner_id == user.get("id"))
+        .first()
     )  # first() returns the value and stops going through the data_base
+
     if todo_model is not None:
         return todo_model
-    else:
-        raise http_exception()
+    raise http_exception()
 
 
 @app.post("/")
-async def create_todo(todo: Todo, data_base: Session = Depends(get_db)):
+async def create_todo(todo: Todo, user: dict = Depends(get_current_user),
+                      data_base: Session = Depends(get_db)):
     """create a "to do" activity"""
+    if user is None:
+        raise get_user_exception()
     todo_model = models.Todos()
     todo_model.title = todo.title
     todo_model.description = todo.description
     todo_model.priority = todo.priority
     todo_model.complete = todo.complete
+    todo_model.owner_id = user.get("id")
 
     data_base.add(todo_model)  # places an object in the session
     data_base.commit()  # flushes changes and COMMITS () the change
@@ -71,11 +99,18 @@ async def create_todo(todo: Todo, data_base: Session = Depends(get_db)):
 
 
 @app.put("/{todo_id}")
-async def update_todo(todo_id: int, todo: Todo, data_base: Session = Depends(get_db)):
-    """updates the todos information"""
-    todo_model = (
-        data_base.query(models.Todos).filter(models.Todos.id == todo_id).first()
-    )
+async def update_todo(todo_id: int, todo: Todo, user: dict = Depends(get_current_user),
+                      data_base: Session = Depends(get_db)):
+    """updates the todos. it takes a user jwt,
+    finds the id where the user id matches the owner id """
+    if user is None:
+        raise get_user_exception()
+
+    todo_model = (data_base.query(models.Todos)
+                  .filter(models.Todos.id == todo_id)
+                  .filter(models.Todos.owner_id == user.get("id"))
+                  .first())
+
     if todo_model is None:
         raise http_exception()
 
@@ -91,10 +126,16 @@ async def update_todo(todo_id: int, todo: Todo, data_base: Session = Depends(get
 
 
 @app.delete("/{todo_id}")
-async def delete_todo(todo_id: int, data_base: Session = Depends(get_db)):
+async def delete_todo(todo_id: int, user: dict = Depends(get_current_user),
+                      data_base: Session = Depends(get_db)):
     """deletes a "to do" activity by passing a todo_id"""
+    if user is None:
+        raise get_user_exception()
     todo_model = (
-        data_base.query(models.Todos).filter(models.Todos.id == todo_id).first()
+        data_base.query(models.Todos)
+        .filter(models.Todos.id == todo_id)
+        .filter(models.Todos.owner_id == user.get("id"))
+        .first()
     )
 
     if todo_model is None:

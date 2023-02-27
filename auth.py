@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -17,7 +16,6 @@ SECRET_KEY = ""
 ALGORITHM = "HS256"
 
 
-@dataclass
 class CreateUser(BaseModel):
     """User table data"""
 
@@ -52,6 +50,7 @@ app = FastAPI()
 
 def get_db():
     """retrieves the conection to the db"""
+    data_base = None
     try:
         data_base = SessionLocal()
         yield data_base
