@@ -1,19 +1,23 @@
+import sys
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-
+from passlib.context import CryptContext
 import models
+
+sys.path.append("..")  # this will allow to import everything in auth's parent directory
 from database import SessionLocal, engine
 from exceptions import get_user_exception, token_exception
 from password_management import get_password_hash, verify_password
 
 SECRET_KEY = ""
 ALGORITHM = "HS256"
+
 
 
 class CreateUser(BaseModel):
@@ -28,7 +32,7 @@ class CreateUser(BaseModel):
 
 # creates the db and does all the importan stuff for the table
 models.Base.metadata.create_all(bind=engine)
-
+bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -45,7 +49,11 @@ def authenticate_user(username: str, password: str, data_base):
     return user
 
 
-app = FastAPI()
+router = APIRouter(
+    prefix="/Auth", tags=["auth"], responses={401: {"user": "Not authorized"}}
+)
+# instead of starting auth as an app,I extend the capability to main.
+# prefix, tags and responses are a way of organizing the api.
 
 
 def get_db():
@@ -85,7 +93,9 @@ async def get_current_user(token: str = Depends(oauth2_bearer)):
         raise get_user_exception() from exc
 
 
-@app.post("/create/user")
+@router.post(
+    "/create/user"
+)  # change app for router to extend the capability to main file
 async def create_new_user(
     create_user: CreateUser, data_base: Session = Depends(get_db)
 ):
@@ -109,7 +119,7 @@ async def create_new_user(
     return {"user has been added."}
 
 
-@app.post("/token")
+@router.post("/token")
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     data_base: Session = Depends(get_db),
