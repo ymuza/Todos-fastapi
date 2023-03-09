@@ -1,6 +1,5 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
-
 from database import Base
 
 
@@ -46,5 +45,6 @@ class Address(Base):
     state = Column(String)
     country = Column(String)
     postalcode = Column(String)
+    apartment_number = Column(Integer)
 
     user_address = relationship("Users", back_populates="address")

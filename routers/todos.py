@@ -1,21 +1,15 @@
 import sys
-
 sys.path.append("..")  # allows to import everything in todos parent directory
 from typing import Optional
-
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-
 import models
 from database import SessionLocal, engine
 from exceptions import http_exception
 from responses import successful_response
-from routers import auth
-
 from .auth import get_current_user, get_user_exception
 
-# from .auth import get_current_user, get_user_exception
 
 router = APIRouter(
     prefix="/todos", tags=["todos"], responses={404: {"description": "not found"}}

@@ -1,7 +1,6 @@
 import sys
 from datetime import datetime, timedelta
 from typing import Optional
-
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -9,7 +8,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import models
-
 sys.path.append("..")  # this will allow to import everything in auth's parent directory
 from database import SessionLocal, engine
 from exceptions import get_user_exception, token_exception
@@ -17,7 +15,6 @@ from password_management import get_password_hash, verify_password
 
 SECRET_KEY = ""
 ALGORITHM = "HS256"
-
 
 
 class CreateUser(BaseModel):
@@ -28,6 +25,7 @@ class CreateUser(BaseModel):
     first_name: str
     last_name: str
     password: str
+    phone_number: Optional[str]
 
 
 # creates the db and does all the importan stuff for the table
@@ -105,6 +103,7 @@ async def create_new_user(
     create_user_model.username = create_user.username
     create_user_model.firstname = create_user.first_name
     create_user_model.lastname = create_user.last_name
+    create_user_model.phone_number = create_user.phone_number
 
     hash_password = get_password_hash(
         create_user.password

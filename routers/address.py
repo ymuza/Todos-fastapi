@@ -6,8 +6,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import models
 from database import SessionLocal, engine
-from exceptions import http_exception
-from responses import successful_response
 from .auth import get_current_user, get_user_exception
 
 router = APIRouter(prefix="/address",
@@ -36,6 +34,7 @@ class Address(BaseModel):
     state: str
     country: str
     postalcode: str
+    apartment_number: Optional[int]
 
 
 @router.post("/")
@@ -52,12 +51,16 @@ async def create_address(address: Address,
     address_model.state = address.state
     address_model.country = address.country
     address_model.postalcode = address.postalcode
+    address_model.apartment_number = address.apartment_number
 
     data_base.add(address_model)
+
     data_base.flush()  # is like a commit, but it returns the id or column created
 
     user_model = data_base.query(models.Users).filter(models.Users.id == user.get("id")).first()
+
     user_model.address_id = address_model.id
+
     data_base.add(user_model)
 
     data_base.commit()
